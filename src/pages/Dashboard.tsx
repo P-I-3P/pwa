@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   LogOut, BookOpen, Users, BarChart2, Bell, Settings,
-  CheckCircle2, Clock, TrendingUp, GraduationCap,
+  CheckCircle2, Clock, TrendingUp, GraduationCap, UserPlus,
 } from "lucide-react";
 
 const stats = [
@@ -49,6 +49,12 @@ export default function Dashboard() {
             <span className="font-bold text-xl text-gradient">P.I</span>
           </div>
           <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/cadastrar-aluno")}
+              className="flex items-center gap-2 text-sm font-semibold"
+              style={{ color: "hsl(var(--primary))" }}>
+              <UserPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Cadastrar Aluno</span>
+            </Button>
             <button className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
               style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}>
               <Bell className="w-4 h-4" />

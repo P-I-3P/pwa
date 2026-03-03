@@ -10,7 +10,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean | "unauthorized">;
   logout: () => void;
   isLoading: boolean;
 }
@@ -51,13 +51,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean | "unauthorized"> => {
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 800));
     const found = MOCKED_USERS.find(
       (u) => u.email === email && u.password === password
     );
     if (found) {
+      if (found.role !== "Administrador") {
+        setIsLoading(false);
+        return "unauthorized";
+      }
       const { password: _, ...userData } = found;
       setUser(userData);
       localStorage.setItem("pi_user", JSON.stringify(userData));
