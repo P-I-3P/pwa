@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { firebaseAuth } from "@/lib/firebase";
 
 interface User {
   id: string;
@@ -10,75 +12,78 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  firebaseUser: FirebaseUser | null;
   login: (email: string, password: string) => Promise<boolean | "unauthorized">;
   logout: () => void;
+  getIdToken: () => Promise<string | null>;
   isLoading: boolean;
 }
-
-const MOCKED_USERS = [
-  {
-    id: "1",
-    email: "aluno@pi.edu",
-    password: "aluno123",
-    name: "João Silva",
-    role: "Aluno",
-    avatar: "JS",
-  },
-  {
-    id: "2",
-    email: "professor@pi.edu",
-    password: "prof123",
-    name: "Dra. Maria Souza",
-    role: "Professora",
-    avatar: "MS",
-  },
-  {
-    id: "3",
-    email: "admin@pi.edu",
-    password: "admin123",
-    name: "Carlos Admin",
-    role: "Administrador",
-    avatar: "CA",
-  },
-];
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem("pi_user");
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(firebaseAuth, async (fbUser) => {
+      if (fbUser) {
+        // verifica se é admin via custom claims
+        const tokenResult = await fbUser.getIdTokenResult();
+        const role = tokenResult.claims.role as string | undefined;
+        if (role === "admin" || role === "coordenacao") {
+          setFirebaseUser(fbUser);
+          setUser({
+            id: fbUser.uid,
+            name: fbUser.displayName ?? fbUser.email ?? "Admin",
+            email: fbUser.email ?? "",
+            role: "Administrador",
+            avatar: (fbUser.displayName ?? "A").slice(0, 2).toUpperCase(),
+          });
+        } else {
+          await signOut(firebaseAuth);
+          setFirebaseUser(null);
+          setUser(null);
+        }
+      } else {
+        setFirebaseUser(null);
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+    return unsub;
+  }, []);
 
   const login = async (email: string, password: string): Promise<boolean | "unauthorized"> => {
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    const found = MOCKED_USERS.find(
-      (u) => u.email === email && u.password === password
-    );
-    if (found) {
-      if (found.role !== "Administrador") {
+    try {
+      const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const tokenResult = await cred.user.getIdTokenResult();
+      const role = tokenResult.claims.role as string | undefined;
+
+      if (role !== "admin" && role !== "coordenacao") {
+        await signOut(firebaseAuth);
         setIsLoading(false);
         return "unauthorized";
       }
-      const { password: _, ...userData } = found;
-      setUser(userData);
-      localStorage.setItem("pi_user", JSON.stringify(userData));
-      setIsLoading(false);
+      // onAuthStateChanged vai setar o user
       return true;
+    } catch {
+      setIsLoading(false);
+      return false;
     }
-    setIsLoading(false);
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("pi_user");
+  const logout = () => signOut(firebaseAuth);
+
+  const getIdToken = async (): Promise<string | null> => {
+    if (!firebaseAuth.currentUser) return null;
+    return firebaseAuth.currentUser.getIdToken(true);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, firebaseUser, login, logout, getIdToken, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
