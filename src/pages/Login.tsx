@@ -17,9 +17,11 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const ok = await login(email, password);
-    if (ok) {
+    const result = await login(email, password);
+    if (result === true) {
       navigate("/dashboard");
+    } else if (result === "unauthorized") {
+      setError("Acesso restrito à Coordenação. Alunos e professores não possuem acesso a este portal.");
     } else {
       setError("E-mail ou senha incorretos. Tente novamente.");
     }
