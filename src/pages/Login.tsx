@@ -27,17 +27,6 @@ export default function Login() {
     }
   };
 
-  const fillDemo = (type: "aluno" | "professor" | "admin") => {
-    const map = {
-      aluno: { email: "aluno@pi.edu", password: "aluno123" },
-      professor: { email: "professor@pi.edu", password: "prof123" },
-      admin: { email: "admin@pi.edu", password: "admin123" },
-    };
-    setEmail(map[type].email);
-    setPassword(map[type].password);
-    setError("");
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
       {/* Background decorations */}
@@ -141,33 +130,6 @@ export default function Login() {
               ) : "Entrar"}
             </Button>
           </form>
-
-          {/* Demo credentials */}
-          <div className="mt-6 pt-5" style={{ borderTop: "1px solid hsl(var(--border))" }}>
-            <p className="text-xs text-center mb-3" style={{ color: "hsl(var(--muted-foreground))" }}>
-              Acesso rápido (modo demonstração)
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: "Aluno", type: "aluno" as const },
-                { label: "Professor", type: "professor" as const },
-                { label: "Admin", type: "admin" as const },
-              ].map(({ label, type }) => (
-                <button
-                  key={type}
-                  onClick={() => fillDemo(type)}
-                  className="text-xs py-2 px-3 rounded-lg transition-all hover:scale-105"
-                  style={{
-                    background: "hsl(var(--secondary))",
-                    color: "hsl(var(--secondary-foreground))",
-                    border: "1px solid hsl(var(--border))",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-xs mt-6" style={{ color: "hsl(var(--muted-foreground))" }}>

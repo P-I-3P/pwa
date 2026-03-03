@@ -9,10 +9,10 @@ import {
   Eye, EyeOff, CheckCircle2, AlertCircle,
 } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_URL ?? "https://www.meuservdidor.com";
 
 export default function CadastrarAluno() {
-  const { user, logout } = useAuth();
+  const { user, logout, getIdToken } = useAuth();
   const navigate = useNavigate();
 
   const [nome, setNome] = useState("");
@@ -41,9 +41,13 @@ export default function CadastrarAluno() {
 
     setLoading(true);
     try {
+      const idToken = await getIdToken();
       const res = await fetch(`${API_BASE}/alunos/criar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
         body: JSON.stringify({ nome: nome.trim(), email: email.trim(), password }),
       });
 
