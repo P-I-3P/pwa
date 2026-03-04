@@ -6,8 +6,13 @@ import {
   LogOut, BookOpen, Users, Bell, Settings,
   GraduationCap, UserPlus, Clock, TrendingUp,
   RefreshCw, AlertCircle, CheckCircle2, BookMarked,
+  Plus, Pencil, Trash2, ChevronDown, ChevronRight, BookCopy,
 } from "lucide-react";
-import { useCursos } from "@/hooks/useCursos";
+import { useCursos, Curso } from "@/hooks/useCursos";
+import { deletarCurso } from "@/hooks/useCursosMutations";
+import { useDisciplinas, deletarDisciplina, Disciplina } from "@/hooks/useDisciplinas";
+import CursoFormModal from "@/components/CursoFormModal";
+import DisciplinaFormModal from "@/components/DisciplinaFormModal";
 
 /* ─── Mock data ─────────────────────────────────────── */
 const alunosMock = [
@@ -30,12 +35,105 @@ const cargaHorariaMock = [
 
 type Tab = "cursos" | "alunos" | "carga";
 
+/* ─── Disciplinas sub-panel ─────────────────────────── */
+function DisciplinasPanel({ curso }: { curso: Curso & { semestres?: number } }) {
+  const { disciplinas, loading, error, refetch } = useDisciplinas(curso.id);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Disciplina | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Deletar disciplina?")) return;
+    setDeleting(id);
+    try { await deletarDisciplina(curso.id, id); refetch(); } catch (e: unknown) { alert(e instanceof Error ? e.message : "Erro"); }
+    setDeleting(null);
+  };
+
+  const semestresCount = (curso as any).semestres ?? (((curso as any).tipo === "bacharel") ? 10 : 5);
+  const grouped = Array.from({ length: semestresCount }, (_, i) => i + 1).map(s => ({
+    sem: s,
+    items: disciplinas.filter(d => d.semestre === s),
+  }));
+
+  return (
+    <div className="mt-3 rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--border))" }}>
+      <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "hsl(var(--secondary))" }}>
+        <span className="text-xs font-semibold" style={{ color: "hsl(var(--primary))" }}>
+          Disciplinas · {disciplinas.length}
+        </span>
+        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" style={{ color: "hsl(var(--primary))" }}
+          onClick={() => { setEditing(null); setShowModal(true); }}>
+          <Plus className="w-3 h-3" /> Nova
+        </Button>
+      </div>
+      {loading && <p className="text-xs px-4 py-3" style={{ color: "hsl(var(--muted-foreground))" }}>Carregando…</p>}
+      {error && <p className="text-xs px-4 py-3" style={{ color: "hsl(var(--destructive))" }}>{error}</p>}
+      {!loading && !error && (
+        <div className="divide-y" style={{ borderColor: "hsl(var(--border))" }}>
+          {grouped.map(({ sem, items }) => items.length > 0 && (
+            <div key={sem} className="px-4 py-2">
+              <p className="text-xs font-semibold mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{sem}º Semestre</p>
+              <div className="space-y-1">
+                {items.map(d => (
+                  <div key={d.id} className="flex items-center justify-between gap-2 py-1 px-2 rounded-lg"
+                    style={{ background: "hsl(var(--muted))" }}>
+                    <div>
+                      {d.codigo && <span className="text-xs font-mono mr-1.5" style={{ color: "hsl(var(--primary))" }}>{d.codigo}</span>}
+                      <span className="text-xs font-medium" style={{ color: "hsl(var(--foreground))" }}>{d.nome}</span>
+                      {d.cargaHoraria && <span className="ml-1.5 text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>· {d.cargaHoraria}h</span>}
+                      {!d.obrigatoria && <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full" style={{ background: "hsl(40 90% 55% / 0.15)", color: "hsl(40 90% 60%)" }}>optativa</span>}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={() => { setEditing(d); setShowModal(true); }} className="w-6 h-6 flex items-center justify-center rounded"
+                        style={{ color: "hsl(var(--muted-foreground))" }}>
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => handleDelete(d.id)} disabled={deleting === d.id} className="w-6 h-6 flex items-center justify-center rounded"
+                        style={{ color: "hsl(var(--destructive))" }}>
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          {disciplinas.length === 0 && (
+            <p className="text-xs px-4 py-3" style={{ color: "hsl(var(--muted-foreground))" }}>Nenhuma disciplina cadastrada.</p>
+          )}
+        </div>
+      )}
+      {showModal && (
+        <DisciplinaFormModal
+          open={showModal}
+          onClose={() => setShowModal(false)}
+          onSuccess={refetch}
+          cursoId={curso.id}
+          cursoSemestres={semestresCount}
+          editingDisciplina={editing}
+        />
+      )}
+    </div>
+  );
+}
+
 /* ─── Component ─────────────────────────────────────── */
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("cursos");
   const { cursos, loading: cursosLoading, error: cursosError, refetch } = useCursos();
+  const [cursoModal, setCursoModal] = useState(false);
+  const [editingCurso, setEditingCurso] = useState<Curso | null>(null);
+  const [expandedCurso, setExpandedCurso] = useState<string | null>(null);
+  const [deletingCurso, setDeletingCurso] = useState<string | null>(null);
+
+  const handleDeleteCurso = async (id: string) => {
+    if (!confirm("Deletar curso e todas as disciplinas?")) return;
+    setDeletingCurso(id);
+    try { await deletarCurso(id); refetch(); } catch (e: unknown) { alert(e instanceof Error ? e.message : "Erro"); }
+    setDeletingCurso(null);
+  };
 
   const handleLogout = () => { logout(); navigate("/login"); };
 
@@ -145,11 +243,19 @@ export default function Dashboard() {
                 <h2 className="font-semibold text-lg" style={{ color: "hsl(var(--foreground))" }}>
                   Cursos cadastrados
                 </h2>
-                <button onClick={refetch} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors"
-                  style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}>
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Atualizar
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={refetch} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}>
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Atualizar
+                  </button>
+                  <button onClick={() => { setEditingCurso(null); setCursoModal(true); }}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold btn-gradient"
+                    style={{ color: "hsl(var(--primary-foreground))" }}>
+                    <Plus className="w-3.5 h-3.5" />
+                    Novo Curso
+                  </button>
+                </div>
               </div>
 
               {cursosLoading && (
@@ -176,34 +282,78 @@ export default function Dashboard() {
               )}
 
               {!cursosLoading && !cursosError && cursos.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="space-y-3">
                   {cursos.map((curso) => (
-                    <div key={curso.id} className="p-4 rounded-xl border transition-all hover:scale-[1.01]"
-                      style={{ background: "hsl(var(--muted))", borderColor: "hsl(var(--border))" }}>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div>
-                          {curso.codigo && (
-                            <p className="text-xs font-mono" style={{ color: "hsl(var(--primary))" }}>{curso.codigo}</p>
-                          )}
-                          <p className="text-sm font-semibold leading-tight mt-0.5" style={{ color: "hsl(var(--foreground))" }}>
-                            {curso.nome}
-                          </p>
+                    <div key={curso.id} className="rounded-xl border overflow-hidden"
+                      style={{ borderColor: "hsl(var(--border))" }}>
+                      {/* Curso header row */}
+                      <div className="flex items-center justify-between gap-2 p-4"
+                        style={{ background: "hsl(var(--muted))" }}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button onClick={() => setExpandedCurso(expandedCurso === curso.id ? null : curso.id)}
+                            className="shrink-0 w-6 h-6 flex items-center justify-center rounded-lg transition-colors"
+                            style={{ color: "hsl(var(--primary))" }}>
+                            {expandedCurso === curso.id
+                              ? <ChevronDown className="w-4 h-4" />
+                              : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                          <div className="min-w-0">
+                            {curso.codigo && (
+                              <p className="text-xs font-mono" style={{ color: "hsl(var(--primary))" }}>{curso.codigo}</p>
+                            )}
+                            <p className="text-sm font-semibold leading-tight" style={{ color: "hsl(var(--foreground))" }}>
+                              {curso.nome}
+                            </p>
+                            <div className="flex gap-3 mt-0.5 text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
+                              {curso.periodo && <span>📅 {curso.periodo}</span>}
+                              {curso.cargaHoraria && <span>⏱ {curso.cargaHoraria}h</span>}
+                              {(curso as any).tipo && <span>🎓 {(curso as any).tipo}</span>}
+                            </div>
+                          </div>
                         </div>
-                        <span className="shrink-0 text-xs px-2 py-0.5 rounded-full font-medium"
-                          style={{
-                            background: curso.ativo ? "hsl(150 60% 50% / 0.15)" : "hsl(0 72% 51% / 0.15)",
-                            color: curso.ativo ? "hsl(150 60% 55%)" : "hsl(0 72% 65%)",
-                          }}>
-                          {curso.ativo ? "Ativo" : "Inativo"}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                            style={{
+                              background: curso.ativo ? "hsl(150 60% 50% / 0.15)" : "hsl(0 72% 51% / 0.15)",
+                              color: curso.ativo ? "hsl(150 60% 55%)" : "hsl(0 72% 65%)",
+                            }}>
+                            {curso.ativo ? "Ativo" : "Inativo"}
+                          </span>
+                          <button onClick={() => { setEditingCurso(curso); setCursoModal(true); }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg"
+                            style={{ color: "hsl(var(--muted-foreground))" }}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => handleDeleteCurso(curso.id)} disabled={deletingCurso === curso.id}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg"
+                            style={{ color: "hsl(var(--destructive))" }}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => setExpandedCurso(expandedCurso === curso.id ? null : curso.id)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-xs gap-1 hidden sm:flex"
+                            style={{ color: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.1)" }}>
+                            <BookCopy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-3 mt-3 text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
-                        {curso.periodo && <span>📅 {curso.periodo}</span>}
-                        {curso.cargaHoraria && <span>⏱ {curso.cargaHoraria}h</span>}
-                      </div>
+                      {/* Disciplinas panel */}
+                      {expandedCurso === curso.id && (
+                        <div className="px-4 pb-4">
+                          <DisciplinasPanel curso={curso as any} />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
+              )}
+
+              {cursoModal && (
+                <CursoFormModal
+                  open={cursoModal}
+                  onClose={() => setCursoModal(false)}
+                  onSuccess={refetch}
+                  editingCurso={editingCurso}
+                />
               )}
             </div>
           )}
