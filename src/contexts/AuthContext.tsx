@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
-      const tokenResult = await cred.user.getIdTokenResult();
+      const tokenResult = await cred.user.getIdTokenResult(true);
       const role = tokenResult.claims.role as string | undefined;
 
       if (role !== "admin" && role !== "coordenacao") {
